@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Summarisation & QA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f8f9fa; }
+        .container { max-width: 700px; margin-top: 40px; }
+        .card { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .result-box { background: #fff; border-radius: 8px; padding: 20px; margin-top: 20px; }
+        #overlaySpinner {
+            display: flex;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.7);
+            z-index: 99999;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card p-4">
+        <h2 class="mb-2 text-center">InquizoAI</h2>
+        <h5 class="mb-4 text-center text-secondary" style="font-weight: 400;">Summarize Smarter. Question Deeper</h5>
+        <form id="inputForm">
+            <div class="mb-3">
+                <label for="textInput" class="form-label">Enter Text</label>
+                <textarea class="form-control" id="textInput" rows="3" placeholder="Paste your text here..."></textarea>
+            </div>
+            <div class="mb-3">
+                <label for="pdfInput" class="form-label">Upload PDF</label>
+                <input class="form-control" type="file" id="pdfInput" accept="application/pdf">
+                <div class="form-text text-warning">⚠️ On free hosting (Render), PDF uploads are limited to about 50–100 MB. Larger files may fail to upload or process.</div>
+            </div>
+            <div class="mb-3">
+                <label for="youtubeInput" class="form-label">Or Enter YouTube Link</label>
+                <input class="form-control" type="url" id="youtubeInput" placeholder="https://youtube.com/...">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Choose Action</label>
+                <select class="form-select" id="actionSelect">
+                    <option value="summarize">Summarize</option>
+                    <option value="ask">Ask Question</option>
+                </select>
+            </div>
+            <div class="mb-3 d-none" id="questionBox">
+                <label for="questionInput" class="form-label">Your Question</label>
+                <input class="form-control" type="text" id="questionInput" placeholder="Type your question...">
+            </div>
+            <button type="submit" class="btn btn-primary w-100" id="submitBtn">Submit</button>
+            <div id="inlineSpinner" class="text-center my-2 d-none">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="ms-2">⚡ Crunching data... generating brilliance!<br>This may take a bit — stay connected and don't refresh. Awesomeness is loading!</span>
+            </div>
+        </form>
+        <div id="resultBox" class="result-box d-none"></div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const form = document.getElementById('inputForm');
+const actionSelect = document.getElementById('actionSelect');
+const questionBox = document.getElementById('questionBox');
+const resultBox = document.getElementById('resultBox');
+const submitBtn = document.getElementById('submitBtn');
+const inlineSpinner = document.getElementById('inlineSpinner');
+
+// Show/hide question input
+actionSelect.addEventListener('change', () => {
+    if (actionSelect.value === 'ask') {
+        questionBox.classList.remove('d-none');
+    } else {
+        questionBox.classList.add('d-none');
+    }
+    resultBox.classList.add('d-none');
+});
+
+function showLoading() {
+    inlineSpinner.classList.remove('d-none');
+}
+function hideLoading() {
+    inlineSpinner.classList.add('d-none');
+}
+
+form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    showLoading();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Answer is Loading';
+    resultBox.innerHTML = '';
+    setTimeout(async () => {
+        const textInput = document.getElementById('textInput').value.trim();
+        const pdfInput = document.getElementById('pdfInput').files[0];
+        const youtubeInput = document.getElementById('youtubeInput').value.trim();
+        const action = actionSelect.value;
+        const question = document.getElementById('questionInput').value.trim();
+
+        // Prepare form data for extraction
+        const formData = new FormData();
+        if (pdfInput) formData.append('file', pdfInput);
+        if (youtubeInput) formData.append('youtube_url', youtubeInput);
+        if (textInput) formData.append('text_input', textInput);
+
+        // Extract text
+        let extractedText = '';
+        try {
+            const extractRes = await fetch('/extract', { method: 'POST', body: formData });
+            const extractData = await extractRes.json();
+            if (extractData.text) {
+                extractedText = extractData.text;
+            } else {
+                resultBox.innerHTML = `<span class='text-danger'>${extractData.error || 'Extraction failed.'}</span>`;
+                resultBox.classList.remove('d-none');
+                hideLoading();
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit';
+                return;
+            }
+        } catch (err) {
+            resultBox.innerHTML = `<span class='text-danger'>Extraction error.</span>`;
+            resultBox.classList.remove('d-none');
+            hideLoading();
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit';
+            return;
+        }
+
+        // Summarize or QA
+        if (action === 'summarize') {
+            try {
+                const res = await fetch('/summarize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: extractedText })
+                });
+                const data = await res.json();
+                if (data.summary) {
+                    resultBox.innerHTML = `<b>Summary:</b><br>${data.summary}`;
+                } else {
+                    resultBox.innerHTML = `<span class='text-danger'>${data.error || 'Summarization failed.'}</span>`;
+                }
+            } catch (err) {
+                resultBox.innerHTML = `<span class='text-danger'>Summarization error.</span>`;
+            }
+            resultBox.classList.remove('d-none');
+            hideLoading();
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit';
+        } else if (action === 'ask') {
+            if (!question) {
+                resultBox.innerHTML = `<span class='text-danger'>Please enter a question.</span>`;
+                resultBox.classList.remove('d-none');
+                hideLoading();
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit';
+                return;
+            }
+            try {
+                const res = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: extractedText, question })
+                });
+                const data = await res.json();
+                if (data.answer) {
+                    if (data.answer === 'Sufficient information is not provided.') {
+                        resultBox.innerHTML = `<b>Answer:</b><br>${data.answer}<br><button id='internetSearchBtn' class='btn btn-outline-primary mt-2'>Go for internet search</button>`;
+                        document.getElementById('internetSearchBtn').onclick = async function() {
+                            resultBox.innerHTML = `<span class='text-info'>Searching the internet...</span>`;
+                            try {
+                                const webRes = await fetch(`/internet_search?q=${encodeURIComponent(question)}`);
+                                const webData = await webRes.json();
+                                if (webData.answer) {
+                                    resultBox.innerHTML = `<b>Internet Answer:</b><br>${webData.answer}`;
+                                } else {
+                                    resultBox.innerHTML = `<span class='text-danger'>No answer found on the internet.</span>`;
+                                }
+                            } catch (err) {
+                                resultBox.innerHTML = `<span class='text-danger'>Internet search error.</span>`;
+                            }
+                            resultBox.classList.remove('d-none');
+                        };
+                    } else {
+                        resultBox.innerHTML = `<b>Answer:</b><br>${data.answer}`;
+                    }
+                } else {
+                    resultBox.innerHTML = `<span class='text-danger'>${data.error || 'Answering failed.'}</span>`;
+                }
+            } catch (err) {
+                resultBox.innerHTML = `<span class='text-danger'>Answering error.</span>`;
+            }
+            resultBox.classList.remove('d-none');
+            hideLoading();
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit';
+        }
+    }, 0);
+});
+</script>
+</body>
+</html> 
