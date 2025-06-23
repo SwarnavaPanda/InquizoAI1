@@ -13,7 +13,7 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app)
 
 # Load summarization and QA pipelines
-summarizer = pipeline('summarization', model='facebook/bart-large-cnn', device=0 if torch.cuda.is_available() else -1)
+summarizer = pipeline('summarization', model='sshleifer/distilbart-cnn-12-6', device=0 if torch.cuda.is_available() else -1)
 qa_pipeline = pipeline('question-answering', model='deepset/roberta-base-squad2', device=0 if torch.cuda.is_available() else -1)
 
 GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', 'default_or_dev_value')
