@@ -16,9 +16,9 @@ CORS(app)
 summarizer = pipeline('summarization', model='facebook/bart-large-cnn', device=0 if torch.cuda.is_available() else -1)
 qa_pipeline = pipeline('question-answering', model='deepset/roberta-base-squad2', device=0 if torch.cuda.is_available() else -1)
 
-GOOGLE_API_KEY = "AIzaSyBWG6-9M_BnGy-TlIxOknuE8qm9Re4olXQ"
-GOOGLE_CSE_ID = "63b9af4770fdc4c09"
-SERPAPI_KEY = "a67700353396522fdc3578fe4e3e06a33cb635defd5190e78711bf77dad977ca"
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', 'default_or_dev_value')
+GOOGLE_CSE_ID = os.environ.get('GOOGLE_CSE_ID', 'default_or_dev_value')
+SERPAPI_KEY = os.environ.get('SERPAPI_KEY', 'default_or_dev_value')
 
 def extract_text_from_pdf(pdf_file):
     text = ""
